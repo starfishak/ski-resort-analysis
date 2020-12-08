@@ -29,12 +29,22 @@ We are initially begining with a model including CPI, annual income for Colorada
 ```{r}
 kable(skiraw, caption="Data Preview")
 cormax <- cor(timeseries)
-model1_a <- dynlm(lag(Annual.Visitors,1)~
+model1_a <- dynlm(lag(Visitors.by.Acres,1)~
                   CPI+
-                  #Annual.Income..Colorado.+
-                  #Unemployment.Rate..Summit.County.+
-                  Sales.Tax.Collected..Retail...Inflation.
-                    ,
+                  Annual.Income..Colorado.+
+                  Unemployment.Rate..Summit.County.+
+                  
+                  #Sales.Tax.Collected..Retail...Inflation.
+                  ,
              data=timeseries)
 summary(model1_a)
+```
+
+```{r}
+model2_a <- dynlm(lag(Summit.County.Peak,1)~
+                    Total.Nearby.Housing,
+                    #Summit.County.Peak
+                  ,
+             data=timeseries)
+summary(model2_a)
 ```
