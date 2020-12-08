@@ -1,0 +1,40 @@
+---
+title: "ECON 344 Final"
+output: 
+  html_document:
+    includes:
+      after_body: footer.html
+author: "Brice Wilbanks"
+---
+<br><br><br><br>
+#Introduction
+First, we must import the libraries needed for the regressions later in this paper. Here, we also define the original dataset and the original time series data for the rest of the paper.
+
+```{r}
+library(car)
+library(dynlm)
+library(knitr)
+skiraw <- read.csv("SkiData_Raw.csv", 
+                   sep = ',',
+                   stringsAsFactors = FALSE
+                   )
+timeseries<-ts(skiraw, start=c(1990,1))
+```
+
+## Defining the Model
+###See page xx in the paper
+
+We are initially begining with a model including CPI, annual income for Coloradans, unemployment rate in Summit County, and the sales tax collected on retail locations adjusted for inflation in 2020 dollars. We will additionally be lagging the skier visits per year by one year to account for season pass holders and ski trip planners. Public sentiment to skiing can be effected in the half year before the season starts between summer and winter. Thus, we must lag our data to account for this. All definitions can be found on page xx of the paper.
+
+```{r}
+kable(skiraw, caption="Data Preview")
+cormax <- cor(timeseries)
+model1_a <- dynlm(lag(Annual.Visitors,1)~
+                  CPI+
+                  #Annual.Income..Colorado.+
+                  #Unemployment.Rate..Summit.County.+
+                  Sales.Tax.Collected..Retail...Inflation.
+                    ,
+             data=timeseries)
+summary(model1_a)
+```
