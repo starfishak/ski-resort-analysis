@@ -1,0 +1,12 @@
+name: Breckenridge-Analysis
+title: Breckenridge-Analysis
+username:
+account: starfishak
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 3376163
+bundleId: 3964672
+url: https://starfishak.shinyapps.io/Breckenridge-Analysis/
+when: 1607502897.56561
+asMultiple: FALSE
+asStatic: FALSE
