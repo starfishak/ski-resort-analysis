@@ -9,10 +9,7 @@ output:
 author: "Brice Wilbanks"
 runtime: shiny
 ---
-# Introduction
-First, we must import the libraries needed for the regressions and plotting later in this paper. Here, we also define the original data set and the original time series data.
-
-```{r, results='asis'}
+```{r, echo=FALSE, include = FALSE}
 library(car)
 library(dynlm)
 library(knitr)
@@ -21,6 +18,7 @@ require(ggplot2)
 require(ggiraph)
 require(ggiraphExtra)
 require(plyr)
+require(Epi)
 skiraw <- read.csv("SkiData_Raw.csv", 
                    sep = ',',
                    stringsAsFactors = FALSE
@@ -34,6 +32,7 @@ cormatrix <- cor(timeseries)
 Below are plots for each of the used independent variables (x-axis) against the chosen dependent variable of annual skier visits per acre (y-axis). The interactive tool below allows readers to choose an independent variable of their choice. 
 
 ```{r echo = FALSE}
+#stat.table(index=X,contents = mean(), data=skiraw, margins = FALSE)
 selectInput("ind_var", "Variable:",
  c(
    "Retail Sales Tax Collected"="Retail.Sales.Tax.Collected..Inflation.","Total Retail Sales"="Total.Retail.Sales..Inflation.","Retail Square Footage (Breckenridge)"="Retail.Square.Footage","Unemployment Rate (Summit County)"="Unemployment.Rate..Summit.","CPI (Nation)"="CPI","Total Nearby Housing"="Total.Nearby.Housing","Annual Median Income (Summit County)"="Annual.Income..Summit.","Annual Median Income (Colorado)"="Annual.Income..Colorado.","Green Terrain Percentage"="Skiable.Green.Terrain","Blue Terrain Percentage"="Skiable.Blue.Terrain","Black Terrain Percentage"="Skiable.Black.Terrain","Double Black Terrain Percentage"="Skiable.Double.Black.Terrain","Snowmaking Acres"="Snowmaking.Acres","Breckenridge Permanent Residents"="Breckenridge.Permanent.Residents","Breckenridge Peak Residents"="Breckenridge.Peak.Residents","Upper Blue Permanent Residents"="Upper.Blue.Permanent.Residents","Upper Blue Peak Residents"="Upper.Blue.Peak.Residents","Summit County Permanent Residents"="Summit.County.Permanent.Residents","Summit County Peak Residents"="Summit.County.Peak.Residents")) 
@@ -48,10 +47,9 @@ ggplot(data = skiraw, aes_string(x = input$ind_var, y = "Visitors.by.Acres"))+
 
 
 # Model 1 - The Economy on Skiing
-We are initially beginning with a model including CPI, annual income for Summit County, and the unemployment rate in Summit County. We will additionally be lagging the skier visits per year by one year to account for season pass holders and ski trip planners. Public sentiment to skiing can be effected in the half year before the season starts between summer and winter, thus, we must lag our data to account for this. All definitions of data can be found on page xx of the paper.
 
 ### Model1_a
-We will include all indicators in the economy category at first.
+In this model, all macroeconic factors in Summit County are considered.
 
 ```{r, results='asis'}
 model1_a <- dynlm(Visitors.by.Acres~
@@ -61,28 +59,32 @@ model1_a <- dynlm(Visitors.by.Acres~
                   Unemployment.Rate..Summit.
                   ,
              data=timeseries)
-# f test, use model1_a as unrestricted and use model w/unemployment rate and logCPI (since they are insignificant, keep the rest). compare these models for the F Test
-# 
-# do a heteroskadicity test
 
 model1_a_resid <- resid(model1_a)
 model1_a_resid_squared <- model1_a_resid^2
 model1_a_yhat <- predict(model1_a)
+head(model1_a_yhat)
 model1_a_yhat_squared <- model1_a_yhat^2
-model1_a_hetero <- lm(model1_a_resid_squared~model1_a_yhat+model1_a_yhat_squared)
+model1_a_hetero <- lm(
+                    model1_a_resid_squared~
+                    #lag(Visitors.by.Acres,1)+
+                    #CPI+
+                    #Annual.Income..Summit.+
+                    #Unemployment.Rate..Summit.+
+                    model1_a_yhat+
+                    model1_a_yhat_squared)
 
 suppressWarnings(
   stargazer(
     model1_a,
-    model1_a_hetero,
+    #model1_a_hetero,
     dep.var.labels = c("",""),
     column.labels = c("Model1 A", "Heteroskedastic Test"),
-    covariate.labels = c("Visitors per Acre Lagged 1 Year", "CPI", "Annual Income" ,"Unemployment", "ŷ",
-                         "ŷ ^ 2", "Intercept"),
+    covariate.labels = c("Visitors per Acre Lagged 1 Year", "CPI", "Annual Income (Summit County)" ,"Unemployment"),
     colnames = FALSE,
     model.numbers = FALSE,
     type = "html",
-    title = "Model1A&nbsp;Summary",
+    title = "Model&nbsp;1A&nbsp;Summary",
     align=TRUE,
     notes.align = "l",
     no.space=TRUE,
@@ -92,13 +94,9 @@ suppressWarnings(
 ```
 
 <br>
-Model1_a provides results for significance of annual income in Summit County and CPI. This is a great start but does not tell the whole story. CPI is only partially significant and is negligible in this paper because of its p-value of 0.058. We can attempt to just model CPI and Income to account for spending rather than unemployment. 
-
-From our output, we can see that the result is not heteroskedastic. This is an important element to continue running the linear regression.
 
 ### Model1_b
-We will now remove unemployment and just evaluate monetary values to see if there is a difference.
-
+In this model, monetary factors of Colorado are analzed with a one year lag. Median annual income is for the state at large.
 ```{r, results='asis'}
 model1_b <- dynlm(Visitors.by.Acres~
                   lag(Visitors.by.Acres,1)+
@@ -111,12 +109,12 @@ suppressWarnings(
   stargazer(
     model1_b,
     dep.var.labels = c(""),
-    column.labels = c("Model1 b"),
-    covariate.labels = c("Visitors per Acre Lagged 1 Year", "CPI", "Annual Income", "Intercept"),
+    column.labels = c("Model 1B"),
+    covariate.labels = c("Visitors per Acre Lagged 1 Year", "CPI", "Annual Income (Colorado)", "Intercept"),
     colnames = FALSE,
     model.numbers = FALSE,
     type = "html",
-    title = "Model1B&nbsp;Summary",
+    title = "Model&nbsp;1B&nbsp;Summary",
     align=TRUE,
     notes.align = "l",
     no.space=TRUE,
@@ -125,34 +123,62 @@ suppressWarnings(
 )
 ```
 
-Interestingly enough, model1_b actually provides less significant results for annual income and CPI meaning that unemployment may be a major factor in skier visits per year. First, we will eliminate the lag. We can hypothesize that income and CPI are elements that are percieved by the consumer in real-time and not delayed. More on this in the paper. We will now isolate these three variables for their own linear regressions. 
-<br><br>
-Jump To...<br>
-[Model1_c](#model1_c) CPI and Annual Income w/o Lag<br>
-[Model1_d](#model1_d) Unemployment<br>
-[Model1_e](#model1_e) CPI & Homoscedasticity<br>
-[Model1_f](#model1_f) Annual Income & Homoscedasticity<br>
-[Plot Maker](#plot-maker) Plot Models
 
-### Model1_c <a name="model1_c"></a> 
-In this model, we will look at real-time CPI and annual income.
-
+### Model1_c
+In this model, the monetary factors of CPI and annual income in Summit County are analyzed with a 1 year lag.
 ```{r, results='asis'}
 model1_c <- dynlm(Visitors.by.Acres~
+                  lag(Visitors.by.Acres,1)+
+                  CPI+
+                  Annual.Income..Summit.
+                  ,
+             data=timeseries)
+
+suppressWarnings(
+  stargazer(
+    model1_c,
+    dep.var.labels = c(""),
+    column.labels = c("Model 1C"),
+    covariate.labels = c("Visitors per Acre Lagged 1 Year", "CPI", "Annual Income (Summit County)", "Constant"),
+    colnames = FALSE,
+    model.numbers = FALSE,
+    type = "html",
+    title = "Model&nbsp;1C&nbsp;Summary",
+    align=TRUE,
+    notes.align = "l",
+    no.space=TRUE,
+    report=('vc*p')
+  )
+)
+```
+
+<br><br>
+Jump To...<br>
+[Model1_d](#model1_d) CPI and Annual Income w/o Lag<br>
+[Model1_e](#model1_e) Unemployment<br>
+[Model1_f](#model1_f) CPI & Homoscedasticity<br>
+[Model1_g](#model1_g) Annual Income & Homoscedasticity<br>
+[Plot Maker](#plot-maker) Plot Models
+
+### Model1_d <a name="model1_d"></a> 
+In this model, real-time CPI and annual income are analyzed with no lag.
+
+```{r, results='asis'}
+model1_d <- dynlm(Visitors.by.Acres~
                   CPI+
                   Annual.Income..Colorado.
                   ,
              data=timeseries)
 suppressWarnings(
   stargazer(
-    model1_c,
+    model1_d,
     dep.var.labels = c(""),
-    column.labels = c("Model1 c"),
+    column.labels = c("Model 1D"),
     covariate.labels = c("CPI", "Annual Income", "Intercept"),
     colnames = FALSE,
     model.numbers = FALSE,
     type = "html",
-    title = "Model1C&nbsp;Summary",
+    title = "Model&nbsp;1D&nbsp;Summary",
     align=TRUE,
     notes.align = "l",
     no.space=TRUE,
@@ -164,23 +190,23 @@ suppressWarnings(
 Against the earlier hypothesis for model1_c, we see that even without a lag, CPI and Annual Income are not related to skier visits per acre. We will stop testing this branch of the model and instead focus on isolating some of the economic incicators.
 <br>[Plot This!](#plot-maker)
 
-### Model1_d <a name="model1_d"></a>
-In this model, we look at unemployment.
+### Model1_e <a name="model1_e"></a>
+In this model, unemployment is isolated with no lag.
 ```{r, results='asis'}
-model1_d <- dynlm(Visitors.by.Acres~
+model1_e <- dynlm(Visitors.by.Acres~
                   Unemployment.Rate..Summit.
                   ,
              data=timeseries)
 suppressWarnings(
   stargazer(
-    model1_d,
+    model1_e,
     dep.var.labels = c(""),
-    column.labels = c("Model1 b"),
+    column.labels = c("Model 1E"),
     covariate.labels = c("Unemployment", "Intercept"),
     colnames = FALSE,
     model.numbers = FALSE,
     type = "html",
-    title = "Model1B&nbsp;Summary",
+    title = "Model&nbsp;1E&nbsp;Summary",
     align=TRUE,
     notes.align = "l",
     no.space=TRUE,
@@ -193,23 +219,23 @@ suppressWarnings(
 In model1_d, we can see unemployment alone is not significantly correlated to skier visits.
 <br>[Plot This!](#plot-maker)<br>
 
-### Model1_e <a name="model1_e"></a>
+### Model1_f <a name="model1_f"></a>
 In this model, we look at national CPI.
 ```{r, results='asis'}
-model1_e <- dynlm(Visitors.by.Acres~
+model1_f <- dynlm(Visitors.by.Acres~
                   CPI
                   ,
              data=timeseries)
 suppressWarnings(
   stargazer(
-    model1_e,
+    model1_f,
     dep.var.labels = c(""),
-    column.labels = c("Model1 e"),
+    column.labels = c("Model 1F"),
     covariate.labels = c("CPI", "Intercept"),
     colnames = FALSE,
     model.numbers = FALSE,
     type = "html",
-    title = "Model1e&nbsp;Summary",
+    title = "Model&nbsp;1F&nbsp;Summary",
     align=TRUE,
     notes.align = "l",
     no.space=TRUE,
@@ -221,78 +247,86 @@ suppressWarnings(
 In model1_e, we find that CPI is significant in relation to skier visits per acre. We will also test to ensure homoscedasticity since our p-value is potentially significant. 
 <br>[Plot This!](#plot-maker)
 ```{r, results='asis'}
-model1_e_resid <- resid(model1_e)
-model1_e_resid_squared <- model1_e_resid^2
-model1_e_yhat <- predict(model1_e)
-model1_e_yhat_squared <- model1_e_yhat^2
-model1_e_hetero <- lm(model1_e_resid_squared~model1_e_yhat+model1_e_yhat_squared)
-
-suppressWarnings(
-  stargazer(
-    model1_e,
-    model1_e_hetero,
-    dep.var.labels = c("",""),
-    column.labels = c("Model1 E", "Heteroskedastic Test"),
-    covariate.labels = c("Annual Income" , "ŷ","ŷ ^ 2", "Intercept"),
-    colnames = FALSE,
-    model.numbers = FALSE,
-    type = "html",
-    title = "Model1E&nbsp;Summary",
-    align=TRUE,
-    notes.align = "l",
-    no.space=TRUE,
-    report=('vc*p')
-  )
-)
-```
-<br>
-Our test for heteroskedasticity returned results that are almost fully heteroskedastic. Our p-value is just above our alpha of 0.05. We can proceed with caution.
-
-### Model1_f <a name="model1_f"></a>
-In this model, we look at just annual income in Summit County.
-```{r, results='asis'}
-model1_f <- dynlm(Visitors.by.Acres~
-                  Annual.Income..Summit.
-                  ,
-             data=timeseries)
-suppressWarnings(
-  stargazer(
-    model1_f,
-    dep.var.labels = c(""),
-    column.labels = c("Model1 f"),
-    covariate.labels = c("Annual Income (Summit)", "Intercept"),
-    colnames = FALSE,
-    model.numbers = FALSE,
-    type = "html",
-    title = "Model1f&nbsp;Summary",
-    align=TRUE,
-    notes.align = "l",
-    no.space=TRUE,
-    report=('vc*p')
-  )
-)
-```
-<br>
-When not controlling for any other variable, we find that annual income is significantly related to skier visits per year. We will now run a test to ensure homoscedasticity.
-
-```{r, results='asis'}
 model1_f_resid <- resid(model1_f)
 model1_f_resid_squared <- model1_f_resid^2
 model1_f_yhat <- predict(model1_f)
 model1_f_yhat_squared <- model1_f_yhat^2
-model1_f_hetero <- lm(model1_f_resid_squared~model1_f_yhat+model1_f_yhat_squared)
+model1_f_hetero <- lm(model1_f_resid_squared~
+                        CPI+
+                        model1_f_yhat+
+                        model1_f_yhat_squared
+                        ,
+                      data=timeseries
+                      )
 
 suppressWarnings(
   stargazer(
     model1_f,
     model1_f_hetero,
     dep.var.labels = c("",""),
-    column.labels = c("Model1 F", "Heteroskedastic Test"),
-    covariate.labels = c("Annual Income" , "ŷ","ŷ ^ 2", "Intercept"),
+    column.labels = c("Model 1F", "Heteroskedastic Test"),
+    covariate.labels = c("CPI" , "ŷ","ŷ ^ 2", "Intercept"),
     colnames = FALSE,
     model.numbers = FALSE,
     type = "html",
-    title = "Model1F&nbsp;Summary",
+    title = "Model&nbsp;1F&nbsp;Summary",
+    align=TRUE,
+    notes.align = "l",
+    no.space=TRUE,
+    report=('vc*p')
+  )
+)
+```
+<br>
+
+### Model1_g <a name="model1_g"></a>
+In this model, we look at just annual income in Summit County.
+```{r, results='asis'}
+model1_g <- dynlm(Visitors.by.Acres~
+                  Annual.Income..Summit.,
+                  data=timeseries)
+suppressWarnings(
+  stargazer(
+    model1_g,
+    dep.var.labels = c(""),
+    column.labels = c("Model 1G"),
+    covariate.labels = c("Annual Income (Summit)", "Intercept"),
+    colnames = FALSE,
+    model.numbers = FALSE,
+    type = "html",
+    title = "Model&nbsp;1G&nbsp;Summary",
+    align=TRUE,
+    notes.align = "l",
+    no.space=TRUE,
+    report=('vc*p')
+  )
+)
+```
+<br>
+
+```{r, results='asis'}
+model1_g_resid <- resid(model1_g)
+model1_g_resid_squared <- model1_g_resid^2
+model1_g_yhat <- predict(model1_g)
+model1_g_yhat_squared <- model1_g_yhat^2
+model1_g_hetero <- lm(model1_g_resid_squared~
+                        Annual.Income..Summit.+
+                        model1_g_yhat+
+                        model1_g_yhat_squared,
+                      data=timeseries,
+                      na.action=na.omit
+                      )
+suppressWarnings(
+  stargazer(
+    model1_g,
+    model1_g_hetero,
+    dep.var.labels = c("",""),
+    column.labels = c("Model1 G", "Heteroskedastic Test"),
+    covariate.labels = c("Annual Income (Summit)" , "ŷ","ŷ ^ 2", "Intercept"),
+    colnames = FALSE,
+    model.numbers = FALSE,
+    type = "html",
+    title = "Model1G&nbsp;Summary",
     align=TRUE,
     notes.align = "l",
     no.space=TRUE,
@@ -303,43 +337,38 @@ suppressWarnings(
 <br>[Plot This!](#plot-maker)
 
 
-# Model 2 - Lodging, Housing, and Population
-In this model, we will be looking at the people's movements and lodging as a factor of skier visits. We only have reliable data for the Upper Blue region of Summit County. 
-```{r, results='asis'}
-model2_a <- dynlm(Visitors.by.Acres~
-                    lag(Visitors.by.Acres,1)+
-                    Upper.Blue.Peak.Residents
-                  ,
-             data=timeseries)
-summary(model2_a)
-```
-
-# Model 3 - Skiable Terrain Offered
+# Model 2 - Skiable Terrain Offered
 In this model, we will be looking at the terrain offered at Breckenridge Ski Resort. During this test, we will also be testing for heteroscedasticity. We will not be lagging the year on this model as skiers pick resorts at real-time for terrain reasons. More on this in the paper.
 ```{r, results='asis'}
-model3_a <- dynlm(Visitors.by.Acres~
+model2_a <- dynlm(Visitors.by.Acres~
                     Skiable.Green.Terrain+
                     Snowmaking.Acres
                   ,
              data=timeseries)
 
-model3_a_resid <- resid(model3_a)
-model3_a_resid_squared <- model3_a_resid^2
-model3_a_yhat <- predict(model3_a)
-model3_a_yhat_squared <- model3_a_yhat^2
-model3_a_hetero <- lm(model3_a_resid_squared~model3_a_yhat+model3_a_yhat_squared)
+model2_a_resid <- resid(model2_a)
+model2_a_resid_squared <- model2_a_resid^2
+model2_a_yhat <- predict(model2_a)
+model2_a_yhat_squared <- model2_a_yhat^2
+model2_a_hetero <- lm(model2_a_resid_squared~
+                        Skiable.Green.Terrain+
+                        Snowmaking.Acres+
+                        model2_a_yhat+
+                        model2_a_yhat_squared,
+                      data=timeseries
+                      )
 
 suppressWarnings(
   stargazer(
-    model3_a,
-    model3_a_hetero,
+    model2_a,
+    model2_a_hetero,
     dep.var.labels = c("",""),
-    column.labels = c("Model3 A", "Heteroskedastic Test"),
+    column.labels = c("Model 2A", "Heteroskedastic Test"),
     covariate.labels = c("Green Terrain Percent", "Snowmaking Acres", "ŷ","ŷ ^ 2", "Intercept"),
     colnames = FALSE,
     model.numbers = FALSE,
     type = "html",
-    title = "Model3A&nbsp;Summary",
+    title = "Model&nbsp;2A&nbsp;Summary",
     align=TRUE,
     notes.align = "l",
     no.space=TRUE,
@@ -359,8 +388,8 @@ selectInput("user_model", "Model:",
    "model1_d",
    "model1_e",
    "model1_f",
-   "model2_a",
-   "model3_a"
+   "model1_g",
+   "model2_a"
    )
  )
 
